@@ -1,85 +1,61 @@
 export interface FolderResponse {
   success: boolean;
   message: string;
-  ruta?: string; // Ruta de la carpeta creada o verificada
+  rutaAbsoluta?: string; // Ruta absoluta para guardar archivos
+  rutaRelativa?: string; // Ruta relativa para la base de datos y la API
 }
 
-export async function carpetaRaiz(ruta: string): Promise<FolderResponse> {
-  try {
-    const info = await Deno.stat(ruta);
-    if (info.isDirectory) {
-      return {
-        success: true,
-        message: `La carpeta raíz ya existe: ${ruta}`,
-        ruta: ruta
-      };
-    } else {
-      return {
-        success: false,
-        message: `Existe un archivo con el nombre ${ruta}, pero no es una carpeta.`,
-        ruta: ruta
-      };
-    }
-  } catch (error) {
-    if (error instanceof Deno.errors.NotFound) {
-      // No existe, así que la creamos
-      await Deno.mkdir(ruta, { recursive: true });
-      return {
-        success: true,
-        message: `Carpeta raíz creada: ${ruta}`,
-        ruta: ruta
-      };
-    } else {
-      return {
-        success: false,
-        message: `Error al verificar/crear la carpeta raíz: ${error.message}`,
-        ruta: ruta
-      };
-    }
-  }
+// Función para obtener la ruta absoluta en la raíz del proyecto
+function getRutaEnRaiz(relativa: string): string {
+  // import.meta.url es la URL del archivo actual (file:///...)
+  // Usamos desde ahí para obtener la raíz del proyecto
+  const urlActual = new URL(import.meta.url);
+  // Quitamos el nombre del archivo y subimos hasta la raíz del proyecto
+  // Asumimos que estamos en Controller/, así que subimos un nivel
+  const raizProyecto = new URL("../", urlActual).pathname;
+  // Unimos la ruta relativa a la raíz del proyecto
+  return `${raizProyecto}${relativa}`;
 }
 
 export async function CreateFolderController(codigo: string): Promise<FolderResponse> {
-
-
-
-  // Verificación de que exista la carpeta raíz
-  const respuestaRaiz = await carpetaRaiz("uploads");
-  if (!respuestaRaiz.success) {
-    return respuestaRaiz;
-  }
-
-  const ruta = "uploads/" + codigo;
-
+  // Verifica y crea la carpeta raíz "uploads"
+  const rutaRelativaRaiz = "uploads";
+  const rutaAbsolutaRaiz = getRutaEnRaiz(rutaRelativaRaiz);
   try {
-    const info = await Deno.stat(ruta);
-    if (info.isDirectory) {
-      return {
-        success: true,
-        message: `La carpeta ${ruta} ya existe`,
-        ruta: ruta
-      };
-    } else {
-      return {
-        success: false,
-        message: `Existe un archivo con el nombre ${ruta}, pero no es una carpeta`,
-        ruta: ruta
-      };
-    }
+    await Deno.stat(rutaAbsolutaRaiz);
   } catch (error) {
     if (error instanceof Deno.errors.NotFound) {
-      // Si no existe, la creamos
-      await Deno.mkdir(ruta, { recursive: true });
+      await Deno.mkdir(rutaAbsolutaRaiz, { recursive: true });
+    }
+  }
+
+  // Carpeta del producto
+  const rutaRelativa = `uploads/${codigo}`;
+  const rutaAbsoluta = getRutaEnRaiz(rutaRelativa);
+
+  try {
+    await Deno.stat(rutaAbsoluta);
+    return {
+      success: true,
+      message: `La carpeta ${rutaAbsoluta} ya existe`,
+      rutaAbsoluta,
+      rutaRelativa,
+    };
+  } catch (error) {
+    if (error instanceof Deno.errors.NotFound) {
+      await Deno.mkdir(rutaAbsoluta, { recursive: true });
       return {
         success: true,
-        message: `Carpeta ${ruta} creada exitosamente`,
-        ruta: ruta
+        message: `Carpeta ${rutaAbsoluta} creada exitosamente`,
+        rutaAbsoluta,
+        rutaRelativa,
       };
     } else {
       return {
         success: false,
         message: `Error al verificar/crear la carpeta: ${error.message}`,
-        ruta: ruta
+        rutaAbsoluta,
+        rutaRelativa,
       };
     }
   }

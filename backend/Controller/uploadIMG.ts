@@ -14,8 +14,18 @@ export async function guardarImagen(imagen: File, codigo: string): Promise<{ suc
     // Finalmente, usamos Deno.writeFile para guardar la imagen físicamente en el servidor.
     const arrayBuffer = await imagen.arrayBuffer();
     const bytes = new Uint8Array(arrayBuffer);
-    const rutaImagen = `${folderResult.ruta}/${imagen.name}`;
-    await Deno.writeFile(rutaImagen, bytes);
+    const nombreArchivo = `imagen_${Date.now()}_${imagen.name}`;
+    const rutaAbsoluta = `${folderResult.rutaAbsoluta}/${nombreArchivo}`;
+    const rutaRelativa = `${folderResult.rutaRelativa}/${nombreArchivo}`;
 
-    return { success: true, ruta: rutaImagen };
+    // Guarda la imagen físicamente
+    await Deno.writeFile(rutaAbsoluta, bytes);
+
+    // Guarda en la base de datos y responde SOLO la ruta relativa
+    const producto = {
+      // ...otros campos...
+      url_ruta_img: rutaRelativa
+    };
+
+    return { success: true, ruta: rutaRelativa };
 }
