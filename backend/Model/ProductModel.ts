@@ -83,4 +83,70 @@ export class Productos {
             };
         }
     }
+
+    // Actualizar producto existente
+    public async actualizarProducto(): Promise<{ success: boolean; message: string }> {
+        try {
+            const { id_productos, codigo, nombre, gramaje, precio, descripcion, stock, url_ruta_img } = this.producto;
+
+            if (!id_productos) {
+                return {
+                    success: false,
+                    message: "ID del producto es requerido para actualizar"
+                };
+            }
+
+            // Verificar que el producto existe
+            const checkQuery = "SELECT id_productos FROM productos WHERE id_productos = ?";
+            const checkResult = await Conexion.execute(checkQuery, [id_productos]);
+
+            if (!checkResult || !checkResult.rows || checkResult.rows.length === 0) {
+                return {
+                    success: false,
+                    message: "Producto no encontrado"
+                };
+            }
+
+            // Verificar que el código no esté duplicado (excluyendo el producto actual)
+            const duplicateCheckQuery = "SELECT id_productos FROM productos WHERE codigo = ? AND id_productos != ?";
+            const duplicateResult = await Conexion.execute(duplicateCheckQuery, [codigo, id_productos]);
+
+            if (duplicateResult && duplicateResult.rows && duplicateResult.rows.length > 0) {
+                return {
+                    success: false,
+                    message: "Ya existe otro producto con ese código"
+                };
+            }
+
+            // Actualizar producto
+            const updateQuery = `
+                UPDATE productos 
+                SET codigo = ?, nombre = ?, gramaje = ?, precio = ?, descripcion = ?, stock = ?, url_ruta_img = ?
+                WHERE id_productos = ?
+            `;
+
+            const result = await Conexion.execute(updateQuery, [
+                codigo, nombre, gramaje, precio, descripcion, stock, url_ruta_img, id_productos
+            ]);
+
+            if (result && result.affectedRows > 0) {
+                return {
+                    success: true,
+                    message: "Producto actualizado exitosamente"
+                };
+            } else {
+                return {
+                    success: false,
+                    message: "No se pudo actualizar el producto"
+                };
+            }
+
+        } catch (error) {
+            console.error("Error al actualizar producto:", error);
+            return {
+                success: false,
+                message: "Error al actualizar producto en la base de datos"
+            };
+        }
+    }
 }

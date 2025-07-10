@@ -60,3 +60,62 @@ export async function CreateFolderController(codigo: string): Promise<FolderResp
     }
   }
 }
+
+// Función para renombrar carpeta cuando cambia el código del producto
+export async function RenombrarCarpetaController(codigoAnterior: string, codigoNuevo: string): Promise<FolderResponse> {
+  try {
+    // Si el código no cambió, no hacer nada
+    if (codigoAnterior === codigoNuevo) {
+      return { 
+        success: true, 
+        message: "El código no cambió, no es necesario renombrar" 
+      };
+    }
+
+    // Obtener rutas absolutas
+    const rutaCarpetaAnterior = getRutaEnRaiz(`uploads/${codigoAnterior}`);
+    const rutaCarpetaNueva = getRutaEnRaiz(`uploads/${codigoNuevo}`);
+
+    // Verificar si la carpeta anterior existe
+    try {
+      await Deno.stat(rutaCarpetaAnterior);
+    } catch (error) {
+      if (error instanceof Deno.errors.NotFound) {
+        return { 
+          success: true, 
+          message: "La carpeta anterior no existe" 
+        };
+      }
+      throw error;
+    }
+
+    // Verificar si la carpeta nueva ya existe
+    try {
+      await Deno.stat(rutaCarpetaNueva);
+      return { 
+        success: false, 
+        message: `Ya existe una carpeta con el código ${codigoNuevo}` 
+      };
+    } catch (error) {
+      if (error instanceof Deno.errors.NotFound) {
+        // La carpeta nueva no existe, podemos renombrar
+      } else {
+        throw error;
+      }
+    }
+
+    // Renombrar la carpeta
+    await Deno.rename(rutaCarpetaAnterior, rutaCarpetaNueva);
+    
+    return { 
+      success: true, 
+      message: `Carpeta renombrada de ${codigoAnterior} a ${codigoNuevo}` 
+    };
+  } catch (error) {
+    console.error("Error al renombrar carpeta:", error);
+    return { 
+      success: false, 
+      message: `Error al renombrar carpeta: ${error.message}` 
+    };
+  }
+}

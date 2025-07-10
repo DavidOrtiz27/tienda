@@ -1,10 +1,20 @@
 import { Context } from "../Dependences/Dependencias.ts";
 import { Productos } from "../Model/ProductModel.ts";
-import { CreateFolderController } from "./CreateFolder.ts";
-import { guardarImagen } from "./uploadIMG.ts";
+import { CreateFolderController, RenombrarCarpetaController } from "./CreateFolder.ts";
+import { guardarImagen, eliminarImagenAnterior } from "./uploadIMG.ts";
 import { z } from "../Dependences/Dependencias.ts";
 
 const productSchema = z.object({
+  codigo: z.string().min(1),
+  nombre: z.string().min(1),
+  gramaje: z.string().min(1),
+  precio: z.coerce.number().positive(),
+  descripcion: z.string().min(1),
+  stock: z.coerce.number().int().nonnegative(),
+});
+
+const updateProductSchema = z.object({
+  id_producto: z.string().min(1),
   codigo: z.string().min(1),
   nombre: z.string().min(1),
   gramaje: z.string().min(1),
@@ -62,14 +72,19 @@ export const postProducts = async (ctx: Context) => {
 
     for (const [key, value] of body.entries()) {
       if (typeof value === "string") {
-        data[key] = value;
-        if (key === "codigo") {
-          codigo = value;
+        // Solo agregar campos que no estén vacíos
+        if (value.trim() !== "") {
+          data[key] = value;
+          if (key === "codigo") {
+            codigo = value;
+          }
         }
       } else {
-        // Guardar referencia al archivo para procesarlo después
-        imagenFile = value;
-        data[key] = value.name;
+        // Solo procesar archivos que tengan un nombre válido
+        if (value && value.name && value.name.trim() !== "") {
+          imagenFile = value;
+          data[key] = value.name;
+        }
       }
     }
 
@@ -138,12 +153,158 @@ export const postProducts = async (ctx: Context) => {
 
 // PUT - Actualizar producto
 export const putProducts = async (ctx: Context) => {
-    const { response } = ctx;
-    response.status = 501;
-    response.body = {
+  const { response, request } = ctx;
+
+  try {
+    const contentLength = request.headers.get("Content-Length");
+    if (contentLength === "0") {
+      response.status = 400;
+      response.body = {
         success: false,
-        message: "Función no implementada aún"
+        message: "El cuerpo de la solicitud está vacío"
+      };
+      return;
+    }
+
+    const body = await request.body.formData();
+
+    const data: Record<string, unknown> = {};
+    let url_ruta_img = "sin_imagen";
+    let codigo = "";
+    let imagenFile: File | null = null;
+
+    for (const [key, value] of body.entries()) {
+      if (typeof value === "string") {
+        // Solo agregar campos que no estén vacíos
+        if (value.trim() !== "") {
+          data[key] = value;
+          if (key === "codigo") {
+            codigo = value;
+          }
+        }
+      } else {
+        // Solo procesar archivos que tengan un nombre válido
+        if (value && value.name && value.name.trim() !== "") {
+          imagenFile = value;
+          data[key] = value.name;
+        }
+      }
+    }
+
+    console.log("Datos para actualizar:", data);
+
+    // Validar datos (sin imagen)
+    const validated = updateProductSchema.parse(data);
+
+    // Verificar que el producto existe antes de actualizar por ID
+    const idProducto = data.id_producto;
+    if (!idProducto) {
+      response.status = 400;
+      response.body = {
+        success: false,
+        message: "ID del producto es requerido para actualizar"
+      };
+      return;
+    }
+
+    const ObjProductCheck = new Productos({ id_productos: Number(idProducto) } as any);
+    const productosExistentes = await ObjProductCheck.listarProductos();
+    const productoExistente = productosExistentes.find(p => p.id_productos === Number(idProducto));
+
+    if (!productoExistente) {
+      response.status = 404;
+      response.body = {
+        success: false,
+        message: "Producto no encontrado con ese ID"
+      };
+      return;
+    }
+
+    // Verificar si el código cambió para renombrar carpeta
+    const codigoCambio = productoExistente.codigo !== codigo;
+    if (codigoCambio) {
+      const resultadoRenombrar = await RenombrarCarpetaController(productoExistente.codigo, codigo);
+      if (!resultadoRenombrar.success) {
+        response.status = 400;
+        response.body = {
+          success: false,
+          message: resultadoRenombrar.message
+        };
+        return;
+      }
+    }
+
+    // Manejo de la imagen usando tus funciones existentes (opcional en PUT)
+    if (imagenFile) {
+      // Eliminar imagen anterior si existe
+      if (productoExistente.url_ruta_img && productoExistente.url_ruta_img !== "sin_imagen") {
+        const resultadoEliminar = await eliminarImagenAnterior(productoExistente.url_ruta_img);
+        if (!resultadoEliminar.success) {
+          console.warn("Advertencia al eliminar imagen anterior:", resultadoEliminar.message);
+        }
+      }
+
+      // Guardar nueva imagen
+      const resultado = await guardarImagen(imagenFile, codigo);
+      if (resultado.success && resultado.ruta) {
+        url_ruta_img = resultado.ruta;
+      } else {
+        response.status = 500;
+        response.body = { 
+          success: false, 
+          message: "Error al guardar la imagen: " + (resultado.message || "Error desconocido") 
+        };
+        return;
+      }
+    } else {
+      // Si no se envía nueva imagen, mantener la imagen existente
+      url_ruta_img = productoExistente.url_ruta_img;
+    }
+
+    // Construir el producto actualizado
+    const productoActualizado = {
+      ...validated,
+      url_ruta_img,
+      id_productos: Number(idProducto) // Usar el ID del formulario
     };
+
+    // Usar el método actualizarProducto del modelo
+    const ObjProduct = new Productos(productoActualizado);
+    const resultado = await ObjProduct.actualizarProducto();
+
+    if (resultado.success) {
+      response.status = 200;
+      response.body = {
+        success: true,
+        message: resultado.message,
+        data: productoActualizado
+      };
+    } else {
+      response.status = 400;
+      response.body = {
+        success: false,
+        message: resultado.message
+      };
+    }
+
+  } catch (error) {
+    console.error("Error en putProducts:", error);
+    if (error instanceof z.ZodError) {
+      response.status = 400;
+      response.body = {
+        success: false,
+        message: "Datos inválidos",
+        errors: error.format(),
+      };
+    } else {
+      response.status = 500;
+      response.body = {
+        success: false,
+        message: "Error interno del servidor",
+        error: error.message,
+      };
+    }
+  }
 };
 
 // DELETE - Eliminar producto

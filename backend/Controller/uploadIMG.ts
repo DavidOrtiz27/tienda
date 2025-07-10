@@ -14,7 +14,7 @@ export async function guardarImagen(imagen: File, codigo: string): Promise<{ suc
     // Finalmente, usamos Deno.writeFile para guardar la imagen físicamente en el servidor.
     const arrayBuffer = await imagen.arrayBuffer();
     const bytes = new Uint8Array(arrayBuffer);
-    const nombreArchivo = `imagen_${Date.now()}_${imagen.name}`;
+    const nombreArchivo = `imagen_${imagen.name}`;
     const rutaAbsoluta = `${folderResult.rutaAbsoluta}/${nombreArchivo}`;
     const rutaRelativa = `${folderResult.rutaRelativa}/${nombreArchivo}`;
 
@@ -28,4 +28,40 @@ export async function guardarImagen(imagen: File, codigo: string): Promise<{ suc
     };
 
     return { success: true, ruta: rutaRelativa };
+}
+
+// Función para eliminar imagen anterior cuando se actualiza
+export async function eliminarImagenAnterior(rutaImagen: string): Promise<{ success: boolean; message?: string }> {
+  try {
+    // Si no hay imagen anterior, no hacer nada
+    if (!rutaImagen || rutaImagen === "sin_imagen") {
+      return { success: true, message: "No hay imagen anterior para eliminar" };
+    }
+
+    // Obtener la ruta absoluta de la imagen
+    const urlActual = new URL(import.meta.url);
+    const raizProyecto = new URL("../", urlActual).pathname;
+    const rutaAbsoluta = `${raizProyecto}${rutaImagen}`;
+
+    // Verificar si el archivo existe antes de eliminarlo
+    try {
+      await Deno.stat(rutaAbsoluta);
+    } catch (error) {
+      if (error instanceof Deno.errors.NotFound) {
+        return { success: true, message: "La imagen anterior ya no existe" };
+      }
+      throw error;
+    }
+
+    // Eliminar el archivo
+    await Deno.remove(rutaAbsoluta);
+    
+    return { success: true, message: "Imagen anterior eliminada exitosamente" };
+  } catch (error) {
+    console.error("Error al eliminar imagen anterior:", error);
+    return { 
+      success: false, 
+      message: `Error al eliminar imagen anterior: ${error.message}` 
+    };
+  }
 }
