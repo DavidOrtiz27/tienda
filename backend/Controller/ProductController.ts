@@ -6,7 +6,7 @@ import { z } from "../Dependences/Dependencias.ts";
 
 
 const ProductSchema = z.object({
-  id_producto: z.number().min(1),
+  id_producto: z.coerce.number().min(1).optional(),
   codigo: z.string().min(1),
   nombre: z.string().min(1),
   gramaje: z.string().min(1),

@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>Test Productos API</title>
+</head>
+<body>
+  <h2>Probar API Productos</h2>
+  <form id="productoForm">
+    <label>
+      ID Producto (solo para actualizar):
+      <input type="number" name="id_producto" id="id_producto">
+    </label><br>
+    <label>
+      Código:
+      <input type="text" name="codigo" required>
+    </label><br>
+    <label>
+      Nombre:
+      <input type="text" name="nombre" required>
+    </label><br>
+    <label>
+      Gramaje:
+      <input type="text" name="gramaje" required>
+    </label><br>
+    <label>
+      Precio:
+      <input type="number" name="precio" required>
+    </label><br>
+    <label>
+      Descripción:
+      <input type="text" name="descripcion" required>
+    </label><br>
+    <label>
+      Stock:
+      <input type="number" name="stock" required>
+    </label><br>
+    <label>
+      Imagen:
+      <input type="file" name="imagen">
+    </label><br><br>
+    <button type="submit" id="btnCrear">Crear Producto (POST)</button>
+    <button type="button" id="btnActualizar">Actualizar Producto (PUT)</button>
+  </form>
+  <pre id="respuesta"></pre>
+
+  <script>
+    const form = document.getElementById('productoForm');
+    const respuesta = document.getElementById('respuesta');
+    const btnActualizar = document.getElementById('btnActualizar');
+
+    // POST (crear)
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const formData = new FormData(form);
+      // Elimina el id_producto si está vacío (no se debe enviar en POST)
+      if (!formData.get('id_producto')) {
+        formData.delete('id_producto');
+      }
+      const res = await fetch('http://localhost:8000/products', {
+        method: 'POST',
+        body: formData
+      });
+      const data = await res.json();
+      respuesta.textContent = JSON.stringify(data, null, 2);
+    });
+
+    // PUT (actualizar)
+    btnActualizar.addEventListener('click', async () => {
+      const formData = new FormData(form);
+      // El id_producto es obligatorio para PUT
+      if (!formData.get('id_producto')) {
+        alert('Debes ingresar el ID del producto para actualizar');
+        return;
+      }
+      const res = await fetch('http://localhost:8000/products', {
+        method: 'PUT',
+        body: formData
+      });
+      const data = await res.json();
+      respuesta.textContent = JSON.stringify(data, null, 2);
+    });
+  </script>
+</body>
+</html>
