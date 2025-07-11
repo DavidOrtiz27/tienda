@@ -1,20 +1,12 @@
-import { Context } from "../Dependences/Dependencias.ts";
+import { Context, RouterContext} from "../Dependences/Dependencias.ts";
 import { Productos } from "../Model/ProductModel.ts";
-import { CreateFolderController, RenombrarCarpetaController } from "./CreateFolder.ts";
+import { CreateFolderController, elimnarCarpeta, RenombrarCarpetaController } from "./CreateFolder.ts";
 import { guardarImagen, actualizarImagen, actualizarImagenConCambioCodigo } from "./uploadIMG.ts";
 import { z } from "../Dependences/Dependencias.ts";
 
-const productSchema = z.object({
-  codigo: z.string().min(1),
-  nombre: z.string().min(1),
-  gramaje: z.string().min(1),
-  precio: z.coerce.number().positive(),
-  descripcion: z.string().min(1),
-  stock: z.coerce.number().int().nonnegative(),
-});
 
-const updateProductSchema = z.object({
-  id_producto: z.string().min(1),
+const ProductSchema = z.object({
+  id_producto: z.number().min(1),
   codigo: z.string().min(1),
   nombre: z.string().min(1),
   gramaje: z.string().min(1),
@@ -91,7 +83,7 @@ export const postProducts = async (ctx: Context) => {
     console.log(data);
 
     // Validar datos (sin imagen)
-    const validated = productSchema.parse(data);
+    const validated = ProductSchema.parse(data);
 
     // Manejo de la imagen usando tus funciones existentes
     if (imagenFile) {
@@ -194,7 +186,7 @@ export const putProducts = async (ctx: Context) => {
     console.log("Datos para actualizar:", data);
 
     // Validar datos (sin imagen)
-    const validated = updateProductSchema.parse(data);
+    const validated = ProductSchema.parse(data);
 
     // Verificar que el producto existe antes de actualizar por ID
     const idProducto = data.id_producto;
@@ -317,13 +309,56 @@ export const putProducts = async (ctx: Context) => {
 };
 
 // DELETE - Eliminar producto
-export const deleteProducts = async (ctx: any) => {
-    const { response } = ctx;
-    response.status = 501;
-    response.body = {
+export const deleteProducts = async (ctx: RouterContext<"/products/:id/:codigo">) => {
+    const { response, params } = ctx;
+
+  try {
+    const id_producto = parseInt(params.id);
+    if (!id_producto || id_producto <= 0) {
+      response.status = 400;
+      response.body = {
         success: false,
-        message: "Función no implementada aún"
-    };
+        message: "ID del producto invalido",
+      };
+      return;
+    }
+
+    const codigo = params.codigo;
+    const objProducto = new Productos();
+    const result = await objProducto.eliminarProducto(id_producto, codigo);
+
+
+    
+    if (result.success) {
+      response.status = 200;
+      response.body = {
+        success: true,
+        message: "Producto eliminado exitosamente",
+      };
+
+    } else {
+      response.status = 400;
+      response.body = {
+        success: false,
+        message: "Error al eliminar el Producto: " + result.message,
+      };
+    }
+  } catch (error) {
+    if (error instanceof Error) {
+      response.status = 500;
+      response.body = {
+        success: false,
+        message: "Error interno del servidor: " + error.message,
+      };
+    } else {
+      response.status = 500;
+      response.body = {
+        success: false,
+        message: "Error interno del servidor",
+        error: String(error),
+      };
+    }
+  }
 };
 
 

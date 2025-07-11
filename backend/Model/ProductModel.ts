@@ -12,9 +12,9 @@ interface ProductData {
 }
 
 export class Productos {
-    private producto: ProductData;
+    private producto: ProductData | null;
 
-    constructor(producto: ProductData) {
+    constructor(producto: ProductData | null = null) {
         this.producto = producto;
     }
 
@@ -39,6 +39,13 @@ export class Productos {
     // Crear nuevo producto
     public async crearProducto(): Promise<{ success: boolean; message: string; id?: number }> {
         try {
+            if (!this.producto) {
+                return {
+                    success: false,
+                    message: "No hay datos del producto para crear"
+                };
+            }
+            
             const { codigo, nombre, gramaje, precio, descripcion, stock, url_ruta_img } = this.producto;
 
             // Verificar que el código no exista
@@ -87,6 +94,13 @@ export class Productos {
     // Actualizar producto existente
     public async actualizarProducto(): Promise<{ success: boolean; message: string }> {
         try {
+            if (!this.producto) {
+                return {
+                    success: false,
+                    message: "No hay datos del producto para actualizar"
+                };
+            }
+            
             const { id_productos, codigo, nombre, gramaje, precio, descripcion, stock, url_ruta_img } = this.producto;
 
             if (!id_productos) {
@@ -146,6 +160,53 @@ export class Productos {
             return {
                 success: false,
                 message: "Error al actualizar producto en la base de datos"
+            };
+        }
+    }
+
+    public async eliminarProducto(id_productos: number, codigo: string): Promise<{ success: boolean, message: string }> {
+        try {
+            // Verificar que el producto existe
+            const checkQuery = "SELECT id_productos FROM productos WHERE id_productos = ?";
+            const checkResult = await Conexion.execute(checkQuery, [id_productos]);
+
+            if (!checkResult || !checkResult.rows || checkResult.rows.length === 0) {
+                return {
+                    success: false,
+                    message: "Producto no encontrado"
+                };
+            }
+
+            // Eliminar de la base de datos
+            const deleteQuery = "DELETE FROM productos WHERE id_productos = ?";
+            const result = await Conexion.execute(deleteQuery, [id_productos]);
+
+            if (result && result.affectedRows > 0) {
+                // Importar la función para eliminar carpeta
+                const { elimnarCarpeta } = await import("../Controller/CreateFolder.ts");
+                
+                // Eliminar la carpeta de imágenes
+                const resultadoCarpeta = await elimnarCarpeta(codigo);
+                if (resultadoCarpeta && !resultadoCarpeta.success) {
+                    console.warn("Advertencia al eliminar carpeta:", resultadoCarpeta.message);
+                }
+
+                return {
+                    success: true,
+                    message: "Producto eliminado exitosamente"
+                };
+            } else {
+                return {
+                    success: false,
+                    message: "No se pudo eliminar el producto de la base de datos"
+                };
+            }
+
+        } catch (error) {
+            console.error("Error al eliminar producto:", error);
+            return {
+                success: false,
+                message: "Error al eliminar producto de la base de datos"
             };
         }
     }

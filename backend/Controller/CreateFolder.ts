@@ -66,9 +66,9 @@ export async function RenombrarCarpetaController(codigoAnterior: string, codigoN
   try {
     // Si el código no cambió, no hacer nada
     if (codigoAnterior === codigoNuevo) {
-      return { 
-        success: true, 
-        message: "El código no cambió, no es necesario renombrar" 
+      return {
+        success: true,
+        message: "El código no cambió, no es necesario renombrar"
       };
     }
 
@@ -81,9 +81,9 @@ export async function RenombrarCarpetaController(codigoAnterior: string, codigoN
       await Deno.stat(rutaCarpetaAnterior);
     } catch (error) {
       if (error instanceof Deno.errors.NotFound) {
-        return { 
-          success: true, 
-          message: "La carpeta anterior no existe" 
+        return {
+          success: true,
+          message: "La carpeta anterior no existe"
         };
       }
       throw error;
@@ -92,9 +92,9 @@ export async function RenombrarCarpetaController(codigoAnterior: string, codigoN
     // Verificar si la carpeta nueva ya existe
     try {
       await Deno.stat(rutaCarpetaNueva);
-      return { 
-        success: false, 
-        message: `Ya existe una carpeta con el código ${codigoNuevo}` 
+      return {
+        success: false,
+        message: `Ya existe una carpeta con el código ${codigoNuevo}`
       };
     } catch (error) {
       if (error instanceof Deno.errors.NotFound) {
@@ -106,16 +106,49 @@ export async function RenombrarCarpetaController(codigoAnterior: string, codigoN
 
     // Renombrar la carpeta
     await Deno.rename(rutaCarpetaAnterior, rutaCarpetaNueva);
-    
-    return { 
-      success: true, 
-      message: `Carpeta renombrada de ${codigoAnterior} a ${codigoNuevo}` 
+
+    return {
+      success: true,
+      message: `Carpeta renombrada de ${codigoAnterior} a ${codigoNuevo}`
     };
   } catch (error) {
     console.error("Error al renombrar carpeta:", error);
+    return {
+      success: false,
+      message: `Error al renombrar carpeta: ${error.message}`
+    };
+  }
+}
+
+
+export async function elimnarCarpeta(codigo: string): Promise<{ success: boolean; message: string }> {
+  try {
+    // Obtener la ruta absoluta de la carpeta
+    const urlActual = new URL(import.meta.url);
+    const raizProyecto = new URL("../", urlActual).pathname;
+    const rutaCarpeta = `${raizProyecto}uploads/${codigo}`;
+
+    // Verificar si la carpeta existe
+    try {
+      await Deno.stat(rutaCarpeta);
+    } catch (error) {
+      if (error instanceof Deno.errors.NotFound) {
+        return { success: true, message: "La carpeta no existe o el código es errado" };
+      }
+      throw error;
+    }
+
+    // Si la carpeta existe, eliminarla completamente con todo su contenido
+    try {
+      await Deno.remove(rutaCarpeta, { recursive: true });
+      return { success: true, message: `Carpeta ${codigo} eliminada exitosamente` };
+    } catch (error) {
+      return { success: false, message: `No se pudo eliminar la carpeta: ${error.message}` };
+    }
+  } catch (error) {
     return { 
       success: false, 
-      message: `Error al renombrar carpeta: ${error.message}` 
+      message: `Error al intentar eliminar la carpeta: ${error.message}` 
     };
   }
 }

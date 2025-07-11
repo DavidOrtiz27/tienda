@@ -7,6 +7,6 @@ ProductRouter
     .get("/products",getProducts)
     .post("/products",postProducts)
     .put("/products",putProducts)
-    .delete("/products/:id",deleteProducts);
+    .delete("/products/:id/:codigo", deleteProducts);
 
 export default ProductRouter
