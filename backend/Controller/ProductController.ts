@@ -1,7 +1,7 @@
 import { Context } from "../Dependences/Dependencias.ts";
 import { Productos } from "../Model/ProductModel.ts";
 import { CreateFolderController, RenombrarCarpetaController } from "./CreateFolder.ts";
-import { guardarImagen, eliminarImagenAnterior } from "./uploadIMG.ts";
+import { guardarImagen, actualizarImagen, actualizarImagenConCambioCodigo } from "./uploadIMG.ts";
 import { z } from "../Dependences/Dependencias.ts";
 
 const productSchema = z.object({
@@ -220,45 +220,54 @@ export const putProducts = async (ctx: Context) => {
       return;
     }
 
-    // Verificar si el código cambió para renombrar carpeta
+    // Verificar si el código cambió y si hay nueva imagen
     const codigoCambio = productoExistente.codigo !== codigo;
-    if (codigoCambio) {
-      const resultadoRenombrar = await RenombrarCarpetaController(productoExistente.codigo, codigo);
-      if (!resultadoRenombrar.success) {
-        response.status = 400;
-        response.body = {
-          success: false,
-          message: resultadoRenombrar.message
-        };
-        return;
-      }
-    }
+    const hayNuevaImagen = imagenFile !== null;
 
-    // Manejo de la imagen usando tus funciones existentes (opcional en PUT)
-    if (imagenFile) {
-      // Eliminar imagen anterior si existe
-      if (productoExistente.url_ruta_img && productoExistente.url_ruta_img !== "sin_imagen") {
-        const resultadoEliminar = await eliminarImagenAnterior(productoExistente.url_ruta_img);
-        if (!resultadoEliminar.success) {
-          console.warn("Advertencia al eliminar imagen anterior:", resultadoEliminar.message);
-        }
-      }
-
-      // Guardar nueva imagen
-      const resultado = await guardarImagen(imagenFile, codigo);
-      if (resultado.success && resultado.ruta) {
-        url_ruta_img = resultado.ruta;
+    // Caso especial: cambio de código Y nueva imagen
+    if (codigoCambio && hayNuevaImagen && imagenFile) {
+      console.log("Caso especial: cambio de código y nueva imagen");
+      const resultadoImagen = await actualizarImagenConCambioCodigo(
+        imagenFile, 
+        codigo, 
+        productoExistente.codigo
+      );
+      if (resultadoImagen.success) {
+        url_ruta_img = resultadoImagen.ruta || productoExistente.url_ruta_img;
       } else {
         response.status = 500;
         response.body = { 
           success: false, 
-          message: "Error al guardar la imagen: " + (resultado.message || "Error desconocido") 
+          message: resultadoImagen.message 
         };
         return;
       }
     } else {
-      // Si no se envía nueva imagen, mantener la imagen existente
-      url_ruta_img = productoExistente.url_ruta_img;
+      // Caso normal: solo cambio de código O solo nueva imagen
+      if (codigoCambio) {
+        const resultadoRenombrar = await RenombrarCarpetaController(productoExistente.codigo, codigo);
+        if (!resultadoRenombrar.success) {
+          response.status = 400;
+          response.body = {
+            success: false,
+            message: resultadoRenombrar.message
+          };
+          return;
+        }
+      }
+
+      // Manejo de la imagen usando la función centralizada
+      const resultadoImagen = await actualizarImagen(imagenFile, codigo, productoExistente.url_ruta_img);
+      if (resultadoImagen.success) {
+        url_ruta_img = resultadoImagen.ruta || productoExistente.url_ruta_img;
+      } else {
+        response.status = 500;
+        response.body = { 
+          success: false, 
+          message: resultadoImagen.message 
+        };
+        return;
+      }
     }
 
     // Construir el producto actualizado
